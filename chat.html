@@ -62,15 +62,14 @@
         .logo-icon {
             width: 35px;
             height: 35px;
-            background: linear-gradient(135deg, #00ff88, #00d4ff);
-            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
-            font-weight: 700;
-            color: #0a0e1a;
-            font-family: 'Space Mono', monospace;
+        }
+
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
         }
 
         .new-chat-btn {
@@ -99,6 +98,21 @@
             border-radius: 8px;
             margin-bottom: 1.5rem;
             font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .api-status.hidden {
+            display: none;
+        }
+
+        .api-status.success {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: var(--accent-primary);
+        }
+
+        .api-status.error {
+            background: rgba(255, 0, 110, 0.1);
+            border-color: var(--accent-tertiary);
         }
 
         .api-status-title {
@@ -205,6 +219,21 @@
         .action-btn:hover {
             border-color: var(--accent-primary);
             color: var(--accent-primary);
+        }
+
+        .import-btn {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .import-btn input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
         }
 
         .messages {
@@ -511,7 +540,28 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="logo">
-                <div class="logo-icon">{}</div>
+                <div class="logo-icon">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <!-- Accolade gauche -->
+                        <path d="M 35 20 Q 25 20 25 30 L 25 40 Q 25 45 20 45 Q 25 45 25 50 L 25 70 Q 25 80 35 80" 
+                              stroke="url(#logoGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <!-- Accolade droite -->
+                        <path d="M 65 20 Q 75 20 75 30 L 75 40 Q 75 45 80 45 Q 75 45 75 50 L 75 70 Q 75 80 65 80" 
+                              stroke="url(#logoGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <!-- Points et traits au centre -->
+                        <circle cx="40" cy="42" r="2" fill="url(#logoGradient)"/>
+                        <circle cx="40" cy="50" r="2" fill="url(#logoGradient)"/>
+                        <line x1="55" y1="38" x2="65" y2="38" stroke="url(#logoGradient)" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="50" y1="46" x2="65" y2="46" stroke="url(#logoGradient)" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="50" y1="54" x2="65" y2="54" stroke="url(#logoGradient)" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
                 <div>Syntaxa IA 🚀</div>
             </div>
 
@@ -519,15 +569,30 @@
                 ➕ Nouvelle Conversation
             </button>
 
-            <div class="api-status">
+            <div class="api-status" id="api-status">
                 <div class="api-status-title">🔑 Clé API OpenAI</div>
                 <input 
                     type="password" 
                     id="api-key" 
                     class="api-key-input" 
                     placeholder="sk-..." 
-                    onchange="saveApiKey()"
+                    onchange="saveAndValidateApiKey()"
                 >
+                <small style="color: var(--text-secondary); display: block; margin-top: 0.5rem;">
+                    Votre clé est stockée localement et sécurisée
+                </small>
+            </div>
+
+            <div class="api-status success hidden" id="api-success">
+                <div class="api-status-title">✅ Clé API Validée</div>
+                <small style="color: var(--accent-primary);">
+                    Votre clé API fonctionne parfaitement !
+                </small>
+                <button 
+                    onclick="showApiInput()" 
+                    style="margin-top: 0.5rem; padding: 0.3rem 0.8rem; background: transparent; border: 1px solid var(--accent-primary); border-radius: 4px; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem;">
+                    Modifier
+                </button>
             </div>
 
             <div class="conversations" id="conversations">
@@ -549,6 +614,10 @@
                     <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                 </select>
                 <div class="action-buttons">
+                    <button class="action-btn import-btn">
+                        📁 Importer
+                        <input type="file" id="file-input" accept=".txt,.pdf,.doc,.docx,.js,.py,.html,.css,.json" onchange="handleFileImport(event)">
+                    </button>
                     <button class="action-btn" onclick="copyConversation()">📋 Copier</button>
                     <button class="action-btn" onclick="clearMessages()">🗑️ Effacer</button>
                 </div>
@@ -615,16 +684,77 @@
 
     <script>
         let conversationHistory = [];
-        let apiKey = localStorage.getItem('openai_api_key') || '';
+        let apiKey = localStorage.getItem('openai_api_key') || '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';
+        let apiKeyValidated = localStorage.getItem('api_key_validated') === 'true';
+        let importedFileContent = '';
 
-        // Charger la clé API au démarrage
-        if (apiKey) {
-            document.getElementById('api-key').value = apiKey;
-        }
+        // Initialiser l'interface au chargement
+        window.onload = function() {
+            if (apiKey && apiKey.startsWith('sk-')) {
+                document.getElementById('api-key').value = apiKey;
+                localStorage.setItem('openai_api_key', apiKey);
+                
+                if (apiKeyValidated) {
+                    document.getElementById('api-status').classList.add('hidden');
+                    document.getElementById('api-success').classList.remove('hidden');
+                }
+            }
+        };
 
-        function saveApiKey() {
+        function saveAndValidateApiKey() {
             apiKey = document.getElementById('api-key').value;
             localStorage.setItem('openai_api_key', apiKey);
+            
+            // Validation basique du format
+            if (apiKey.startsWith('sk-') && apiKey.length > 20) {
+                apiKeyValidated = true;
+                localStorage.setItem('api_key_validated', 'true');
+                document.getElementById('api-status').classList.add('hidden');
+                document.getElementById('api-success').classList.remove('hidden');
+            }
+        }
+
+        function showApiInput() {
+            document.getElementById('api-status').classList.remove('hidden');
+            document.getElementById('api-success').classList.add('hidden');
+            document.getElementById('api-key').focus();
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                importedFileContent = e.target.result;
+                const fileName = file.name;
+                
+                // Ajouter un message système indiquant le fichier importé
+                const messagesDiv = document.getElementById('messages');
+                const welcomeElement = document.querySelector('.welcome');
+                if (welcomeElement) {
+                    welcomeElement.remove();
+                }
+                
+                const systemMsg = document.createElement('div');
+                systemMsg.className = 'message';
+                systemMsg.innerHTML = `
+                    <div class="message-avatar" style="background: linear-gradient(135deg, var(--accent-tertiary), var(--accent-primary));">📁</div>
+                    <div class="message-content">
+                        <div class="message-text" style="background: rgba(0, 255, 136, 0.05);">
+                            <strong>✅ Fichier importé : ${fileName}</strong><br>
+                            <small style="color: var(--text-secondary);">Le contenu a été chargé. Vous pouvez maintenant poser des questions à son sujet.</small>
+                        </div>
+                    </div>
+                `;
+                messagesDiv.appendChild(systemMsg);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                
+                // Pré-remplir l'input avec une suggestion
+                document.getElementById('user-input').value = `Analyse ce fichier et donne-moi un résumé : ${fileName}`;
+            };
+            
+            reader.readAsText(file);
         }
 
         function setSuggestion(text) {
@@ -662,12 +792,13 @@
 
         async function sendMessage() {
             const input = document.getElementById('user-input');
-            const message = input.value.trim();
+            let message = input.value.trim();
             
             if (!message) return;
             
-            if (!apiKey) {
+            if (!apiKey || !apiKey.startsWith('sk-')) {
                 alert('Veuillez d\'abord entrer votre clé API OpenAI dans la barre latérale.');
+                showApiInput();
                 return;
             }
 
@@ -677,8 +808,13 @@
                 welcomeElement.remove();
             }
 
+            // Si un fichier a été importé, l'inclure dans le message
+            if (importedFileContent) {
+                message = `${message}\n\n[Contenu du fichier importé]:\n${importedFileContent}`;
+            }
+
             // Ajouter le message de l'utilisateur
-            addMessage('user', message);
+            addMessage('user', input.value.trim()); // Afficher sans le contenu du fichier
             conversationHistory.push({ role: 'user', content: message });
             
             input.value = '';
@@ -715,7 +851,21 @@
                 removeThinking(thinkingId);
 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.setItem('api_key_validated', 'false');
+                        apiKeyValidated = false;
+                        showApiInput();
+                        throw new Error('Clé API invalide. Veuillez vérifier votre clé.');
+                    }
                     throw new Error(`Erreur API: ${response.status}`);
+                }
+
+                // Marquer la clé comme validée après le premier succès
+                if (!apiKeyValidated) {
+                    apiKeyValidated = true;
+                    localStorage.setItem('api_key_validated', 'true');
+                    document.getElementById('api-status').classList.add('hidden');
+                    document.getElementById('api-success').classList.remove('hidden');
                 }
 
                 const data = await response.json();
@@ -723,6 +873,9 @@
                 
                 conversationHistory.push({ role: 'assistant', content: aiMessage });
                 addMessage('ai', aiMessage);
+
+                // Réinitialiser le contenu du fichier importé après utilisation
+                importedFileContent = '';
 
             } catch (error) {
                 removeThinking(thinkingId);
